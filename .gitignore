@@ -1,0 +1,20 @@
+# Secrets and local configuration -- never commit these.
+.env
+.env.local
+.env.*.local
+config.local.py
+
+# Runtime output of the bot.
+trades/
+
+# Python build and cache artifacts.
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Tooling scratch files.
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
