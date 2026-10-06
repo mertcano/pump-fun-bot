@@ -2,6 +2,7 @@ import asyncio
 import json
 import base64
 import struct
+import os
 import base58
 from solana.rpc.async_api import AsyncClient
 from solana.transaction import Transaction
@@ -34,8 +35,13 @@ SYSTEM_RENT = Pubkey.from_string("SysvarRent111111111111111111111111111111111")
 SOL = Pubkey.from_string("So11111111111111111111111111111111111111112")
 LAMPORTS_PER_SOL = 1_000_000_000
 
-# RPC endpoint
-RPC_ENDPOINT = "https://nd-789-855-895.p2pify.com/a24eec46e256346bd48e6a7ae9aab4c5"
+# RPC endpoint.
+# The endpoint used to be hardcoded here, which leaked a billable provider API
+# key into version control. Read it from the environment instead.
+RPC_ENDPOINT = os.environ.get(
+    "SOLANA_NODE_RPC_ENDPOINT",
+    "https://your-rpc-provider/your-key",
+)
 
 class BondingCurveState:
     _STRUCT = Struct(
@@ -69,7 +75,16 @@ def calculate_pump_curve_price(curve_state: BondingCurveState) -> float:
     return (curve_state.virtual_sol_reserves / LAMPORTS_PER_SOL) / (curve_state.virtual_token_reserves / 10 ** TOKEN_DECIMALS)
 
 async def buy_token(mint: Pubkey, bonding_curve: Pubkey, associated_bonding_curve: Pubkey, amount: float, slippage: float = 0.01, max_retries=5):
-    private_key = base58.b58decode("5dhFD6KgGThDa2c8ytNquSVgpD1o1WuG4qGrSaT4yy3AbW812dYctgUEj8wV4XoWYfmdqFy6UaWLK8QZ7XzgnLZE")
+    # A live ed25519 secret key used to be hardcoded at this line, which meant
+    # anyone with read access to the repository could drain the wallet. Read it
+    # from the environment and fail closed when it is absent.
+    secret_key = os.environ.get("SOLANA_PRIVATE_KEY", "")
+    if not secret_key:
+        raise RuntimeError(
+            "SOLANA_PRIVATE_KEY is not set. Export the base58 secret key of the "
+            "paying wallet before running this script."
+        )
+    private_key = base58.b58decode(secret_key)
     payer = Keypair.from_bytes(private_key)
 
     async with AsyncClient(RPC_ENDPOINT) as client:
@@ -165,7 +180,12 @@ async def buy_token(mint: Pubkey, bonding_curve: Pubkey, associated_bonding_curv
                 else:
                     print("Max retries reached. Unable to complete the transaction.")
 
-RPC_NODE_URL = "wss://ws-nd-789-855-895.p2pify.com/a24eec46e256346bd48e6a7ae9aab4c5"
+# WebSocket node URL. Read from the environment: this value used to embed a
+# billable provider API key in version control.
+RPC_NODE_URL = os.environ.get(
+    "SOLANA_NODE_WSS_ENDPOINT",
+    "wss://your-rpc-provider/your-key",
+)
 
 def load_idl(file_path):
     with open(file_path, 'r') as f:
